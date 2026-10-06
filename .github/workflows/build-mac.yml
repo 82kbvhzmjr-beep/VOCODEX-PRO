@@ -1,0 +1,44 @@
+name: Build Vocodex Pro (macOS)
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure (VST3 + AU, universal arm64/x86_64)
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release --parallel 4
+
+      - name: Package
+        run: |
+          set -e
+          mkdir -p dist/VocodexPro-Mac
+          VST3=$(find build -type d -name "*.vst3" | head -n 1)
+          AU=$(find build -type d -name "*.component" | head -n 1)
+          echo "VST3: $VST3"
+          echo "AU:   $AU"
+          test -n "$VST3"
+          test -n "$AU"
+          cp -R "$VST3" dist/VocodexPro-Mac/
+          cp -R "$AU"   dist/VocodexPro-Mac/
+          cp Instalar.command dist/VocodexPro-Mac/
+          chmod +x dist/VocodexPro-Mac/Instalar.command
+          codesign --force --deep -s - dist/VocodexPro-Mac/*.vst3 dist/VocodexPro-Mac/*.component
+          cd dist
+          zip -r -y VocodexPro-Mac.zip VocodexPro-Mac
+
+      - name: Subir zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: VocodexPro-Mac
+          path: dist/VocodexPro-Mac.zip
